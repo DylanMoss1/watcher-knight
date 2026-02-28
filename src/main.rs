@@ -80,7 +80,31 @@ fn run() {
         return;
     }
 
+    warn_unstaged_files(root);
     claude::run_watchers(&markers, &diff);
+}
+
+fn warn_unstaged_files(root: &std::path::Path) {
+    let output = process::Command::new("git")
+        .args(["ls-files", "--others", "--exclude-standard"])
+        .current_dir(root)
+        .output();
+    let output = match output {
+        Ok(o) if o.status.success() => o,
+        _ => return,
+    };
+    let lines: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| format!("  - {}", l.trim()))
+        .collect();
+    if lines.is_empty() {
+        return;
+    }
+    eprintln!(
+        "\x1b[33m[WARNING] new unstaged files:\n{}\x1b[0m\n",
+        lines.join("\n")
+    );
 }
 
 fn git_changed_files(root: &std::path::Path) -> Vec<String> {
