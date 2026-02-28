@@ -33,14 +33,16 @@ fn strip_comment_prefix<'a>(
     None
 }
 
-/// Extract the name from text after `<watcher-knight`.
+const TAG_PREFIXES: &[&str] = &["<wk", "<watcher-knight"];
+
+/// Extract the name from text after the tag prefix.
 /// Expects formats like `: some-name` or `: some-name />`.
 fn extract_name(after_tag: &str) -> String {
     let s = after_tag.trim_start();
     let s = s.strip_prefix(':').unwrap_or(s).trim_start();
-    // Take everything up to whitespace, newline, or `/>`.
+    // Take everything up to whitespace, newline, `[`, or `/>`.
     let end = s
-        .find(|c: char| c.is_whitespace() || c == '/')
+        .find(|c: char| c.is_whitespace() || c == '/' || c == '[')
         .unwrap_or(s.len());
     s[..end].to_string()
 }
@@ -60,6 +62,52 @@ fn normalize_path(path: &Path) -> PathBuf {
     components.iter().collect()
 }
 
+/// Resolve a comma-separated list of file entries relative to the marker's parent directory.
+fn resolve_file_entries(entries: &str, marker_parent: &Path, repo_root: &Path) -> Vec<String> {
+    let mut files = Vec::new();
+    for entry in entries.split(',') {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        let joined = marker_parent.join(entry);
+        let normalized = normalize_path(&joined);
+        let pattern_str = normalized.to_string_lossy().to_string();
+
+        let abs_pattern = repo_root.join(&pattern_str);
+        let abs_str = abs_pattern.to_string_lossy().to_string();
+        match glob::glob(&abs_str) {
+            Ok(paths) => {
+                let mut matched = false;
+                for abs_path in paths.flatten() {
+                    if let Ok(rel) = abs_path.strip_prefix(repo_root) {
+                        files.push(rel.to_string_lossy().to_string());
+                        matched = true;
+                    }
+                }
+                if !matched {
+                    files.push(pattern_str);
+                }
+            }
+            Err(_) => {
+                files.push(pattern_str);
+            }
+        }
+    }
+    files
+}
+
+/// Extract inline file list from `[file1, file2]` on the tag line.
+fn extract_inline_files(after_tag: &str, marker_parent: &Path, repo_root: &Path) -> Vec<String> {
+    let Some(start) = after_tag.find('[') else {
+        return Vec::new();
+    };
+    let Some(end) = after_tag[start..].find(']') else {
+        return Vec::new();
+    };
+    resolve_file_entries(&after_tag[start + 1..start + end], marker_parent, repo_root)
+}
+
 /// Parse `files = { ./a.ts, ./b.py }` entries from body lines.
 /// Returns (resolved file paths, remaining body lines for instruction).
 fn extract_files<'a>(
@@ -72,39 +120,7 @@ fn extract_files<'a>(
 
     for &line in body {
         if let Some(inner) = parse_files_line(line) {
-            for entry in inner.split(',') {
-                let entry = entry.trim();
-                if entry.is_empty() {
-                    continue;
-                }
-                let joined = marker_parent.join(entry);
-                let normalized = normalize_path(&joined);
-                let pattern_str = normalized.to_string_lossy().to_string();
-
-                // Try glob expansion against the repo root
-                let abs_pattern = repo_root.join(&pattern_str);
-                let abs_str = abs_pattern.to_string_lossy().to_string();
-                match glob::glob(&abs_str) {
-                    Ok(paths) => {
-                        let mut matched = false;
-                        for path_result in paths {
-                            if let Ok(abs_path) = path_result {
-                                if let Ok(rel) = abs_path.strip_prefix(repo_root) {
-                                    files.push(rel.to_string_lossy().to_string());
-                                    matched = true;
-                                }
-                            }
-                        }
-                        // If no matches (e.g. file doesn't exist yet), keep the literal pattern
-                        if !matched {
-                            files.push(pattern_str);
-                        }
-                    }
-                    Err(_) => {
-                        files.push(pattern_str);
-                    }
-                }
-            }
+            files.extend(resolve_file_entries(&inner, marker_parent, repo_root));
         } else {
             remaining.push(line);
         }
@@ -138,21 +154,31 @@ pub fn parse_markers(contents: &str, rel_path: &str, repo_root: &Path) -> Vec<Ma
                 continue;
             }
         };
-        if !after_prefix.trim_start().starts_with("<watcher-knight") {
-            i += 1;
-            continue;
-        }
+        let trimmed_prefix = after_prefix.trim_start();
+        let after_tag = TAG_PREFIXES
+            .iter()
+            .filter_map(|tag| trimmed_prefix.strip_prefix(tag))
+            .next();
+        let after_tag = match after_tag {
+            Some(rest) => rest,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
 
         let start_line = i + 1;
-        let after_tag = after_prefix
-            .trim_start()
-            .strip_prefix("<watcher-knight")
-            .unwrap();
         let name = extract_name(after_tag);
+        let inline_files = extract_inline_files(after_tag, marker_parent, repo_root);
 
-        // Single-line: `// <watcher-knight: name some instruction />`
-        if let Some(before_close) = after_tag.strip_suffix("/>") {
-            // Strip the name portion from the instruction text.
+        // Strip everything up to `]` if there's an inline file list.
+        let after_files = match after_tag.find(']') {
+            Some(pos) => &after_tag[pos + 1..],
+            None => after_tag,
+        };
+
+        // Single-line: `// <wk: name instruction />` or `// <wk: name [file1, file2] instruction />`
+        if let Some(before_close) = after_files.strip_suffix("/>") {
             let text = before_close.trim();
             let text = text.strip_prefix(':').unwrap_or(text).trim_start();
             let instruction = text.strip_prefix(&name).unwrap_or(text).trim().to_string();
@@ -161,7 +187,7 @@ pub fn parse_markers(contents: &str, rel_path: &str, repo_root: &Path) -> Vec<Ma
                 rel_path: rel_path.into(),
                 line: start_line,
                 instruction,
-                files: Vec::new(),
+                files: inline_files,
             });
             i += 1;
             continue;

@@ -13,7 +13,7 @@ struct WatcherResult {
     reason: Option<String>,
 }
 
-pub fn run_watchers(markers: &[Marker], diff: &str) {
+pub fn run_watchers(markers: &[Marker], diff: &str, model: &str) {
     let n = markers.len();
     eprintln!("running {n} watchers\n");
 
@@ -24,9 +24,10 @@ pub fn run_watchers(markers: &[Marker], diff: &str) {
         let name = marker.name.clone();
         let location = format!("{}:{}", marker.rel_path, marker.line);
         let prompt_text = prompt::build_watcher_prompt(marker, diff);
+        let model = model.to_string();
 
         thread::spawn(move || {
-            let result = run_single_watcher(&name, &location, &prompt_text);
+            let result = run_single_watcher(&name, &location, &prompt_text, &model);
             tx.send(result).ok();
         });
     }
@@ -83,12 +84,12 @@ pub fn run_watchers(markers: &[Marker], diff: &str) {
     }
 }
 
-fn run_single_watcher(name: &str, location: &str, prompt: &str) -> WatcherResult {
+fn run_single_watcher(name: &str, location: &str, prompt: &str, model: &str) -> WatcherResult {
     let mut child = process::Command::new("claude")
         .args([
             "-p",
             "--model",
-            "haiku",
+            model,
             "--permission-mode",
             "dontAsk",
             "--allowedTools",

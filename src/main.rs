@@ -19,17 +19,29 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Scan the repository for watcher-knight markers and validate them
-    Run,
+    Run {
+        /// AI model to use [haiku, sonnet, opus]
+        #[arg(long, default_value = "haiku")]
+        model: String,
+
+        /// Git commit to diff against
+        #[arg(long, default_value = "HEAD")]
+        commit: String,
+
+        /// Run all watchers regardless of changed files
+        #[arg(long)]
+        all: bool,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Command::Run => run(),
+        Command::Run { model, commit, all } => run(&model, &commit, all),
     }
 }
 
-fn run() {
+fn run(model: &str, commit: &str, all: bool) {
     let repo = Repository::discover(".").unwrap_or_else(|_| {
         eprintln!("Error: not inside a git repository");
         process::exit(1);
@@ -66,22 +78,24 @@ fn run() {
         return;
     }
 
-    let diff = git_diff(root);
+    let diff = git_diff(root, commit);
     if diff.trim().is_empty() {
-        eprintln!("No changes since HEAD. Nothing to validate.");
+        eprintln!("No changes since {commit}. Nothing to validate.");
         return;
     }
 
-    let changed_files = git_changed_files(root);
-    markers.retain(|m| m.files.is_empty() || m.files.iter().any(|f| changed_files.contains(f)));
+    if !all {
+        let changed_files = git_changed_files(root, commit);
+        markers.retain(|m| m.files.is_empty() || m.files.iter().any(|f| changed_files.contains(f)));
 
-    if markers.is_empty() {
-        eprintln!("No watchers matched the changed files.");
-        return;
+        if markers.is_empty() {
+            eprintln!("No watchers matched the changed files.");
+            return;
+        }
     }
 
     warn_unstaged_files(root);
-    claude::run_watchers(&markers, &diff);
+    claude::run_watchers(&markers, &diff, model);
 }
 
 fn warn_unstaged_files(root: &std::path::Path) {
@@ -107,18 +121,18 @@ fn warn_unstaged_files(root: &std::path::Path) {
     );
 }
 
-fn git_changed_files(root: &std::path::Path) -> Vec<String> {
+fn git_changed_files(root: &std::path::Path, commit: &str) -> Vec<String> {
     let output = process::Command::new("git")
-        .args(["diff", "HEAD", "--name-only"])
+        .args(["diff", commit, "--name-only"])
         .current_dir(root)
         .output()
         .unwrap_or_else(|e| {
-            eprintln!("Error: failed to run `git diff HEAD --name-only`: {e}");
+            eprintln!("Error: failed to run `git diff {commit} --name-only`: {e}");
             process::exit(1);
         });
     if !output.status.success() {
         eprintln!(
-            "Error: `git diff HEAD --name-only` failed: {}",
+            "Error: `git diff {commit} --name-only` failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
         process::exit(1);
@@ -129,18 +143,18 @@ fn git_changed_files(root: &std::path::Path) -> Vec<String> {
         .collect()
 }
 
-fn git_diff(root: &std::path::Path) -> String {
+fn git_diff(root: &std::path::Path, commit: &str) -> String {
     let output = process::Command::new("git")
-        .args(["diff", "HEAD"])
+        .args(["diff", commit])
         .current_dir(root)
         .output()
         .unwrap_or_else(|e| {
-            eprintln!("Error: failed to run `git diff HEAD`: {e}");
+            eprintln!("Error: failed to run `git diff {commit}`: {e}");
             process::exit(1);
         });
     if !output.status.success() {
         eprintln!(
-            "Error: `git diff HEAD` failed: {}",
+            "Error: `git diff {commit}` failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
         process::exit(1);
