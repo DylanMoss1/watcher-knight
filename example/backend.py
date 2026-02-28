@@ -13,5 +13,11 @@ def get_user_data():
     )
 
 
+@app.route("/delete_user")
+def delete_user():
+    name = request.args.get("name", "Unknown")
+    return jsonify({"deleted": True, "name": name})
+
+
 if __name__ == "__main__":
     app.run(debug=True)
