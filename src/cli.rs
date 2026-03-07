@@ -21,7 +21,7 @@ pub enum Command {
     /// Scan the repository for watcher-knight markers and validate them
     Run {
         /// AI model to use [haiku, sonnet, opus]
-        #[arg(long, default_value = "haiku")]
+        #[arg(long, default_value = "sonnet")]
         model: String,
 
         /// Use git diff mode. Optional ref to diff against (default: auto-detect origin/main or origin/master)

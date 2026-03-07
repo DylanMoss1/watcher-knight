@@ -78,7 +78,7 @@ watcher-knight run [OPTIONS]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--model <MODEL>` | `haiku` | AI model to use (`haiku`, `sonnet`, `opus`) |
+| `--model <MODEL>` | `sonnet` | AI model to use (`haiku`, `sonnet`, `opus`) |
 | `--commit <COMMIT>` | `HEAD` | Git ref to diff against |
 | `--all` | | Run all watchers, not just those matching changed files |
 
