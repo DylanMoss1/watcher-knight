@@ -2,19 +2,26 @@ use std::fmt::Write as _;
 
 use crate::marker::Marker;
 
-pub fn build_watcher_prompt(marker: &Marker, diff: &str) -> String {
+pub fn build_watcher_prompt(marker: &Marker, diff: Option<&str>) -> String {
     let mut out = String::new();
+
+    let diff_instruction = if diff.is_some() {
+        "Use the diff to understand what changed, then ALWAYS use Read/Grep/Glob to \
+         verify the invariant against the actual codebase."
+    } else {
+        "ALWAYS use Read/Grep/Glob to verify the invariant against the actual codebase."
+    };
+
     writeln!(
         out,
-        "You are validating a code invariant against a diff.\n\
+        "You are validating a code invariant.\n\
          \n\
          Invariant name: {}\n\
          File: {} (line {})\n\
          Instruction: {}\n\
          \n\
          Check whether the current state of the code satisfies this invariant.\n\
-         Use the diff to understand what changed, then ALWAYS use Read/Grep/Glob to \
-         verify the invariant against the actual codebase. You must confirm that any \
+         {diff_instruction} You must confirm that any \
          files or code referenced by the invariant actually exist. If a file referenced \
          by the invariant does not exist, the invariant is violated.\n\
          \n\
@@ -30,13 +37,16 @@ pub fn build_watcher_prompt(marker: &Marker, diff: &str) -> String {
     )
     .unwrap();
 
-    writeln!(out).unwrap();
-    writeln!(out, "## Diff (HEAD → working tree)").unwrap();
-    writeln!(out, "```diff").unwrap();
-    write!(out, "{diff}").unwrap();
-    if !diff.ends_with('\n') {
+    if let Some(diff) = diff {
         writeln!(out).unwrap();
+        writeln!(out, "## Diff (HEAD → working tree)").unwrap();
+        writeln!(out, "```diff").unwrap();
+        write!(out, "{diff}").unwrap();
+        if !diff.ends_with('\n') {
+            writeln!(out).unwrap();
+        }
+        writeln!(out, "```").unwrap();
     }
-    writeln!(out, "```").unwrap();
+
     out
 }

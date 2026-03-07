@@ -6,17 +6,21 @@ use std::thread;
 use crate::marker::Marker;
 use crate::prompt;
 
-struct WatcherResult {
-    name: String,
-    location: String,
-    is_valid: bool,
-    reason: Option<String>,
+pub struct WatcherResult {
+    pub name: String,
+    pub location: String,
+    pub is_valid: bool,
+    pub reason: Option<String>,
+    pub cached: bool,
 }
 
-pub fn run_watchers(markers: &[Marker], diff: &str, model: &str) {
-    let n = markers.len();
-    eprintln!("running {n} watchers\n");
-
+pub fn run_watchers(
+    markers: &[Marker],
+    diff: Option<&str>,
+    model: &str,
+    total: usize,
+    completed_offset: usize,
+) -> Vec<WatcherResult> {
     let (tx, rx) = mpsc::channel();
 
     for marker in markers {
@@ -34,7 +38,7 @@ pub fn run_watchers(markers: &[Marker], diff: &str, model: &str) {
     drop(tx);
 
     let mut results: Vec<WatcherResult> = Vec::new();
-    let mut completed = 0;
+    let mut completed = completed_offset;
 
     for result in rx {
         completed += 1;
@@ -43,32 +47,23 @@ pub fn run_watchers(markers: &[Marker], diff: &str, model: &str) {
         } else {
             "\x1b[31mFAILED\x1b[0m"
         };
-        eprintln!("[{completed}/{n}] {}... {status}", result.name);
+        eprintln!("[{completed}/{total}] {}... {status}", result.name);
         results.push(result);
     }
 
-    // Final output to stdout
-    println!();
-    println!("---- RESULTS ----");
-    println!();
-    for r in &results {
-        let status = if r.is_valid {
-            "\x1b[32mOK\x1b[0m"
-        } else {
-            "\x1b[31mFAILED\x1b[0m"
-        };
-        println!("watcher {}... {status}", r.name);
-    }
+    results
+}
 
+pub fn print_results(results: &[WatcherResult]) {
     let failures: Vec<_> = results.iter().filter(|r| !r.is_valid).collect();
     if !failures.is_empty() {
         println!();
-        println!("\x1b[31m---- FAILURES ----");
+        println!("\x1b[31m==== FAILURES ====");
         for f in &failures {
             println!();
             println!("---- {} ({}) ----", f.name, f.location);
             println!();
-            println!("{}", f.reason.as_deref().unwrap_or("unknown reason"));
+            println!("{}\n", f.reason.as_deref().unwrap_or("unknown reason"));
         }
         print!("\x1b[0m");
     }
@@ -127,7 +122,8 @@ fn run_single_watcher(name: &str, location: &str, prompt: &str, model: &str) -> 
             name: name.to_string(),
             location: location.to_string(),
             is_valid: false,
-            reason: Some(format!("claude process exited with {}", output.status)),
+            reason: Some(format!("process exited with {}", output.status)),
+            cached: false,
         };
     }
 
@@ -157,13 +153,15 @@ fn parse_response(name: &str, location: &str, text: &str) -> WatcherResult {
                 location: location.to_string(),
                 is_valid,
                 reason,
+                cached: false,
             }
         }
         Err(_) => WatcherResult {
             name: name.to_string(),
             location: location.to_string(),
             is_valid: false,
-            reason: Some(format!("malformed response: {text}")),
+            reason: Some(text.to_string()),
+            cached: false,
         },
     }
 }

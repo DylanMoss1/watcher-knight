@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 const COMMENT_PREFIXES: &[&str] = &["//", "#", "--", "%", ";"];
 
+#[derive(Clone)]
 pub struct Marker {
     pub name: String,
     pub rel_path: String,

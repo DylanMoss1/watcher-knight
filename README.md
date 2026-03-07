@@ -115,7 +115,7 @@ watcher api-contract... OK
 watcher only-port-5000... OK
 watcher error-handling... FAILED
 
----- FAILURES ----
+==== FAILURES ====
 
 ---- error-handling (src/client.ts:42) ----
 
