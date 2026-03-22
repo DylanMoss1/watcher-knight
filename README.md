@@ -30,14 +30,14 @@ Add "watchers" anywhere in your codebase using the format:
 For example (`example/frontend.ts`):
 
 ```ts
-// EXAMPLE 1: Validating APIs
+// -- EXAMPLE 1: Validating APIs --
 // <wk: front-and-backend-api-align [./frontend.ts, ./backend.py]
 // Ensure that the backend (backend.py) and frontend (frontend.ts) API definitions align />
 //
 // ^ This will fail: the API definitions do not align
 // (The previous result will be cached unless ./frontend.ts or ./backend.py are updated)
 class BackendAPI {
-  // EXAMPLE 2: Verifying port constraints
+  // -- EXAMPLE 2: Verifying port constraints --
   // <wk: only-port-5000 [.]  <-- recursive on all files in current dir
   // options={model="haiku"}
   // Check that this is the only service started on port 5000. />
@@ -45,7 +45,7 @@ class BackendAPI {
   // ^ This will pass: this is the only service on port 5000
   constructor(private baseUrl = "http://localhost:5000") { }
 
-  // EXAMPLE 3: Updating READMEs
+  // -- EXAMPLE 3: Updating READMEs --
   // <wk: error-400-in-readme [.]
   // example/README.md should explain what happens when the server returns error code 400 />
   //
