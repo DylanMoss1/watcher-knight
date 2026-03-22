@@ -203,7 +203,8 @@ fn nom_file_list(input: &str) -> IResult<&str, Vec<&str>> {
     let (input, _) = space0(input)?;
     let (input, _) = char('[')(input)?;
     let (input, _) = space0(input)?;
-    let (input, files) = separated_list0(tuple((space0, char(','), space0)), nom_file_entry)(input)?;
+    let (input, files) =
+        separated_list0(tuple((space0, char(','), space0)), nom_file_entry)(input)?;
     let (input, _) = space0(input)?;
     let (input, _) = char(']')(input)?;
     Ok((input, files))
@@ -230,8 +231,7 @@ fn nom_options(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     let (input, _) = space0(input)?;
     let (input, _) = char('{')(input)?;
     let (input, _) = space0(input)?;
-    let (input, pairs) =
-        separated_list0(tuple((space0, char(','), space0)), nom_key_value)(input)?;
+    let (input, pairs) = separated_list0(tuple((space0, char(','), space0)), nom_key_value)(input)?;
     let (input, _) = space0(input)?;
     let (input, _) = char('}')(input)?;
     Ok((input, pairs))
@@ -262,11 +262,7 @@ fn parse_raw_tag(
     // Parse tag prefix.
     let remaining = match nom_tag_prefix(first_line) {
         Ok((r, _)) => r,
-        Err(_) => {
-            return Err(err(
-                "expected `<wk` tag prefix".to_string(),
-            ))
-        }
+        Err(_) => return Err(err("expected `<wk` tag prefix".to_string())),
     };
 
     // Parse colon.
@@ -280,25 +276,24 @@ fn parse_raw_tag(
     };
 
     // Parse name.
-    let (remaining, name) = match nom_name(remaining) {
-        Ok((r, n)) => (r, n.to_string()),
-        Err(_) => {
-            return Err(err(
+    let (remaining, name) =
+        match nom_name(remaining) {
+            Ok((r, n)) => (r, n.to_string()),
+            Err(_) => return Err(err(
                 "expected watcher name after `<wk:` (names may contain alphanumeric characters, \
                  hyphens, and underscores)"
                     .to_string(),
-            ))
-        }
-    };
+            )),
+        };
 
     // Parse optional inline file list.
     let remaining_trimmed = remaining.trim_start();
-    let (remaining, mut raw_files) = if remaining_trimmed.starts_with('[') {
+    let (remaining, raw_files) = if remaining_trimmed.starts_with('[') {
         match nom_file_list(remaining) {
             Ok((r, files)) => (r, files),
             Err(_) => {
                 return Err(err(
-                    "unclosed `[` in file list: expected matching `]`".to_string(),
+                    "unclosed `[` in file list: expected matching `]`".to_string()
                 ))
             }
         }
@@ -348,9 +343,7 @@ fn parse_raw_tag(
 
     let instruction = instruction_parts.join("\n");
     if instruction.is_empty() {
-        return Err(err(format!(
-            "watcher `{name}` has no instruction text"
-        )));
+        return Err(err(format!("watcher `{name}` has no instruction text")));
     }
 
     // Resolve file paths.
@@ -474,8 +467,7 @@ mod tests {
 
     #[test]
     fn single_line_with_files() {
-        let (markers, errors) =
-            parse("// <wk: api-check [./a.ts, ./b.py] Ensure alignment. />");
+        let (markers, errors) = parse("// <wk: api-check [./a.ts, ./b.py] Ensure alignment. />");
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(markers.len(), 1);
         assert_eq!(markers[0].name, "api-check");
@@ -963,8 +955,11 @@ not a comment
 
     #[test]
     fn parse_rel_path_propagated() {
-        let (markers, _) =
-            parse_markers("// <wk: test Check. />", "src/deep/file.ts", Path::new("/repo"));
+        let (markers, _) = parse_markers(
+            "// <wk: test Check. />",
+            "src/deep/file.ts",
+            Path::new("/repo"),
+        );
         assert_eq!(markers[0].rel_path, "src/deep/file.ts");
     }
 
@@ -990,18 +985,12 @@ line 3
 
     #[test]
     fn normalize_path_multiple_parent_dirs() {
-        assert_eq!(
-            normalize_path(Path::new("a/b/../../c")),
-            PathBuf::from("c"),
-        );
+        assert_eq!(normalize_path(Path::new("a/b/../../c")), PathBuf::from("c"),);
     }
 
     #[test]
     fn normalize_path_no_special_components() {
-        assert_eq!(
-            normalize_path(Path::new("a/b/c")),
-            PathBuf::from("a/b/c"),
-        );
+        assert_eq!(normalize_path(Path::new("a/b/c")), PathBuf::from("a/b/c"),);
     }
 
     // ── nom parser additional tests ───────────────────────────────────────
