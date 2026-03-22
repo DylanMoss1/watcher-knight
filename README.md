@@ -27,7 +27,7 @@ Add "watchers" anywhere in your codebase using the format:
 // Properties to check for / validate />
 ```
 
-For example (`example/frontend.ts`):
+For example (`examples/frontend.ts`):
 
 ```js
 // -- EXAMPLE 1: Validating APIs --
@@ -36,13 +36,16 @@ For example (`example/frontend.ts`):
 //
 // ^ This will fail: the API definitions do not align
 // (The previous result will be cached unless ./frontend.ts or ./backend.py are updated)
+
 class BackendAPI {
+
   // -- EXAMPLE 2: Verifying port constraints --
   // <wk: only-port-5000 [./**/*]
   // options={model="haiku"}
   // Check that this is the only service started on port 5000. />
   //
   // ^ This will pass: this is the only service on port 5000
+
   constructor(private baseUrl = "http://localhost:5000") { }
 
   // -- EXAMPLE 3: Updating README --
@@ -50,6 +53,7 @@ class BackendAPI {
   // example/README.md should explain what happens when the server returns error code 400 />
   //
   // ^ This will fail: the check cannot be completed as example/README.md does not exist
+
   async getUserData(name: string): Promise<UserData> {
     const res = await fetch(
       `${this.baseUrl}/get_user_data?name=${encodeURIComponent(name)}`,
