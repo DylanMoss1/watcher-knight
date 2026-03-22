@@ -13,9 +13,9 @@ For each marker, it runs a Claude agent to check whether the property still hold
 Think of it as assertions, but for cross-file concerns, architectural constraints, and integration contracts that traditional linters / type checkers / test suites can't catch.
 
 Features: 
-- **Caching.** Cache previous results if files-to-watch do not change
+- **Caching.** Cache previous results if `files-to-watch` do not change
 - **Git mode.** Run watchers against git diffs.
-- **Per-watcher options.** Run watchers with different Claude models and permissions.
+- **Per-watcher options.** Specify Claude models and permissions for each watcher.
 
 ## Example Usage
 
@@ -24,7 +24,7 @@ Add "watchers" anywhere in your codebase using the format:
 ```ts
 // <wk: <watcher-name> [<files-to-watch (relative to current dir)>]
 // options={...}  <-- optional
-// Properties to check for & validate />
+// Properties to check for / validate />
 ```
 
 For example (`example/frontend.ts`):

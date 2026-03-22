@@ -7,7 +7,7 @@ interface UserData {
 // WATCHER-KNIGHT FORMAT:
 // <wr: <watcher-name> [<files-to-watch (relative to current dir)>]
 // options={...}  <-- optional
-// Properties to check for & validate />
+// Properties to check for / validate />
 
 // EXAMPLE 1: Validating APIs
 // <wk: front-and-backend-api-align [./frontend.ts, ./backend.py]
