@@ -42,7 +42,7 @@ Exit code 1 if any watcher fails.
 - Tags: `<wk:`
 - Comment styles: `//`, `#`, `--`, `%`, `;`
 - File scope `[...]` restricts which files trigger the watcher; paths are relative to the marker's directory, glob patterns supported
-- `options={...}` sets per-marker options (e.g. model override)
+- `options={...}` sets per-marker options (e.g. `model` override, `tools` to control allowed Claude tools)
 
 ## Project Structure
 
@@ -54,7 +54,7 @@ src/
   claude.rs     Spawns claude CLI processes in parallel, parses JSON results
   cache.rs      Hash-based caching in .watcher_knight/cache.json
   prompt.rs     Builds AI validation prompts
-example/
+examples/
   frontend.ts   Example markers (cross-file validation, port constraints, README checks)
   backend.py    Example Flask backend for cross-file demo
 ```
@@ -65,4 +65,4 @@ example/
 - **Claude invocation**: Spawns `claude -p` with `--allowedTools Read,Grep,Glob` and `--permission-mode dontAsk`
 - **Caching**: Keyed on `marker_name::file_path`, invalidated when marker instruction hash or watched file content hashes change. Unscoped watchers (no files) always re-run. Cache stored in `.watcher_knight/cache.json`
 - **Diff mode**: Filters markers to only those whose scoped files appear in `git diff --name-only`
-- **Rust edition 2024**, dependencies: clap 4, git2, glob, serde/serde_json, walkdir
+- **Rust edition 2024**, dependencies: clap 4, git2, glob, nom, serde/serde_json, walkdir
