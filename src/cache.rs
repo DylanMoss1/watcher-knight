@@ -447,11 +447,7 @@ mod tests {
         fs::write(dir.path().join("a.ts"), "aaa").unwrap();
         fs::write(dir.path().join("b.ts"), "bbb").unwrap();
 
-        let m = make_marker(
-            "w",
-            "Check",
-            vec!["a.ts".to_string(), "b.ts".to_string()],
-        );
+        let m = make_marker("w", "Check", vec!["a.ts".to_string(), "b.ts".to_string()]);
         let hashes = hash_watched_files(&m, dir.path());
         assert_eq!(hashes.len(), 2);
         assert!(hashes.contains_key("a.ts"));

@@ -63,10 +63,7 @@ fn resolve_root(explicit: Option<&Path>) -> PathBuf {
         match path.canonicalize() {
             Ok(p) if p.is_dir() => return p,
             Ok(p) => {
-                eprintln!(
-                    "Error: `{}` is not a directory",
-                    p.display(),
-                );
+                eprintln!("Error: `{}` is not a directory", p.display(),);
                 process::exit(1);
             }
             Err(e) => {

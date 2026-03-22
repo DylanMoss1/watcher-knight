@@ -92,12 +92,20 @@ pub fn print_results(results: &[WatcherResult]) {
             "watcher-knight result: \x1b[32mOK\x1b[0m. {passed} passed; 0 failed{cached_suffix}"
         );
     } else {
-        println!("watcher-knight result: \x1b[31mFAILED\x1b[0m. {passed} passed; {failed} failed{cached_suffix}");
+        println!(
+            "watcher-knight result: \x1b[31mFAILED\x1b[0m. {passed} passed; {failed} failed{cached_suffix}"
+        );
         process::exit(1);
     }
 }
 
-fn run_single_watcher(name: &str, location: &str, prompt: &str, model: &str, tools: &str) -> WatcherResult {
+fn run_single_watcher(
+    name: &str,
+    location: &str,
+    prompt: &str,
+    model: &str,
+    tools: &str,
+) -> WatcherResult {
     let mut child = process::Command::new("claude")
         .args([
             "-p",

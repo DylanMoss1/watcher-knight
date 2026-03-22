@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use nom::IResult;
+use nom::Parser;
 use nom::bytes::complete::{tag, take_while, take_while1};
 use nom::character::complete::{char, space0};
 use nom::multi::separated_list0;
-use nom::Parser;
-use nom::IResult;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -231,7 +231,8 @@ fn nom_options(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     let (input, _) = space0(input)?;
     let (input, _) = char('{')(input)?;
     let (input, _) = space0(input)?;
-    let (input, pairs) = separated_list0((space0, char(','), space0), nom_key_value).parse(input)?;
+    let (input, pairs) =
+        separated_list0((space0, char(','), space0), nom_key_value).parse(input)?;
     let (input, _) = space0(input)?;
     let (input, _) = char('}')(input)?;
     Ok((input, pairs))
@@ -271,7 +272,7 @@ fn parse_raw_tag(
         Err(_) => {
             return Err(err(
                 "expected `:` after tag prefix (e.g., `<wk: my-watcher ...`)".to_string(),
-            ))
+            ));
         }
     };
 
@@ -294,7 +295,7 @@ fn parse_raw_tag(
             Err(_) => {
                 return Err(err(
                     "unclosed `[` in file list: expected matching `]`".to_string()
-                ))
+                ));
             }
         }
     } else {
@@ -1017,5 +1018,32 @@ line 3
     fn nom_name_numeric_start() {
         let (_, name) = nom_name("123abc").unwrap();
         assert_eq!(name, "123abc");
+    }
+
+    #[test]
+    fn example_frontend_parses_markers() {
+        let contents =
+            std::fs::read_to_string("example/frontend.ts").expect("example/frontend.ts missing");
+        let repo_root = Path::new(".");
+        let (markers, _errors) = parse_markers(&contents, "example/frontend.ts", repo_root);
+        // frontend.ts has a format-explanation comment that looks like a marker but
+        // isn't valid — so we only check that real markers are found.
+        assert!(
+            markers.len() >= 2,
+            "expected at least 2 markers in example/frontend.ts, got {}",
+            markers.len()
+        );
+    }
+
+    #[test]
+    fn example_backend_parses_without_errors() {
+        let contents =
+            std::fs::read_to_string("example/backend.py").expect("example/backend.py missing");
+        let repo_root = Path::new(".");
+        let (_markers, errors) = parse_markers(&contents, "example/backend.py", repo_root);
+        assert!(
+            errors.is_empty(),
+            "parse errors in example/backend.py: {errors:?}"
+        );
     }
 }
