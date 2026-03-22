@@ -37,8 +37,7 @@ pub struct Marker {
 
 const COMMENT_PREFIXES: &[&str] = &["//", "#", "--", "%", ";"];
 
-// Ordered longest-first so `<watcher-knight` is tried before `<wk`.
-const TAG_PREFIXES: &[&str] = &["<watcher-knight", "<wk"];
+const TAG_PREFIXES: &[&str] = &["<wk"];
 
 // ── Phase 1: Tag Extraction ────────────────────────────────────────────────────
 
@@ -50,7 +49,7 @@ struct RawTag {
     line: usize,
 }
 
-/// Find `<wk` or `<watcher-knight` in a line. Returns `(byte_offset, prefix_str)`.
+/// Find `<wk` in a line. Returns `(byte_offset, prefix_str)`.
 /// Only matches when the prefix is followed by `:` or whitespace (to avoid false
 /// positives like `<wking>`).
 fn find_tag_in_line(line: &str) -> Option<(usize, &'static str)> {
@@ -87,7 +86,7 @@ fn strip_continuation<'a>(line: &'a str, comment_prefix: Option<&str>) -> Option
     }
 }
 
-/// Walk through the file contents, find every `<wk .../>` or `<watcher-knight .../>`
+/// Walk through the file contents, find every `<wk .../>`
 /// span, and return the raw tag content with comment prefixes stripped.
 fn extract_raw_tags(contents: &str, file: &str) -> (Vec<RawTag>, Vec<ParseError>) {
     let lines: Vec<&str> = contents.lines().collect();
@@ -110,7 +109,7 @@ fn extract_raw_tags(contents: &str, file: &str) -> (Vec<RawTag>, Vec<ParseError>
         let before_tag = &lines[i][..col];
         let comment_prefix = detect_comment_prefix(before_tag);
 
-        // Content from `<wk` (or `<watcher-knight`) onward on this line.
+        // Content from `<wk` onward on this line.
         let after_tag_start = &lines[i][col..];
 
         // Step 2: Find the corresponding `/>`.
@@ -174,9 +173,9 @@ fn extract_raw_tags(contents: &str, file: &str) -> (Vec<RawTag>, Vec<ParseError>
 
 // ── Phase 2: nom Parsers ───────────────────────────────────────────────────────
 
-/// Match `<wk` or `<watcher-knight`.
+/// Match `<wk`.
 fn nom_tag_prefix(input: &str) -> IResult<&str, &str> {
-    nom::branch::alt((tag("<watcher-knight"), tag("<wk")))(input)
+    tag("<wk")(input)
 }
 
 /// Match `:` with optional surrounding whitespace.
@@ -238,24 +237,6 @@ fn nom_options(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     Ok((input, pairs))
 }
 
-/// Match `files = { file1, file2, ... }`.
-fn nom_files_directive(input: &str) -> IResult<&str, Vec<&str>> {
-    let (input, _) = tag("files")(input)?;
-    let (input, _) = space0(input)?;
-    let (input, _) = char('=')(input)?;
-    let (input, _) = space0(input)?;
-    let (input, _) = char('{')(input)?;
-    let (input, _) = space0(input)?;
-    let (input, files) = separated_list0(
-        tuple((space0, char(','), space0)),
-        take_while1(|c: char| c != ',' && c != '}'),
-    )(input)?;
-    let (input, _) = space0(input)?;
-    let (input, _) = char('}')(input)?;
-    let files: Vec<&str> = files.iter().map(|s| s.trim()).collect();
-    Ok((input, files))
-}
-
 // ── Phase 2: Tag Parsing ───────────────────────────────────────────────────────
 
 /// Parse a raw tag content string into a `Marker`, or return a `ParseError`.
@@ -283,7 +264,7 @@ fn parse_raw_tag(
         Ok((r, _)) => r,
         Err(_) => {
             return Err(err(
-                "expected `<wk` or `<watcher-knight` tag prefix".to_string(),
+                "expected `<wk` tag prefix".to_string(),
             ))
         }
     };
@@ -359,14 +340,6 @@ fn parse_raw_tag(
                             .to_string(),
                     });
                 }
-            }
-        }
-
-        // Try files = {...}
-        if trimmed.starts_with("files") {
-            if let Ok((_, directive_files)) = nom_files_directive(trimmed) {
-                raw_files.extend(directive_files);
-                continue;
             }
         }
 
@@ -542,7 +515,7 @@ mod tests {
     #[test]
     fn multi_line_with_options() {
         let input = "\
-// <wk: port-check [.]
+// <wk: port-check [./*]
 // options={model=\"haiku\"}
 // Only one service on port 5000. />";
         let (markers, errors) = parse(input);
@@ -551,49 +524,6 @@ mod tests {
         assert_eq!(markers[0].name, "port-check");
         assert_eq!(markers[0].instruction, "Only one service on port 5000.");
         assert_eq!(markers[0].options.get("model").unwrap(), "haiku");
-    }
-
-    #[test]
-    fn multi_line_with_files_directive() {
-        let input = "\
-// <wk: schema-sync
-// files = { ./migrations/*.sql, ./models.rs }
-// Ensure migrations match models. />";
-        let (markers, errors) = parse(input);
-        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
-        assert_eq!(markers.len(), 1);
-        assert_eq!(markers[0].name, "schema-sync");
-        assert_eq!(markers[0].instruction, "Ensure migrations match models.");
-        // File paths are resolved via glob; since these don't exist on disk,
-        // they are kept as normalized paths.
-        assert_eq!(markers[0].files.len(), 2);
-    }
-
-    #[test]
-    fn multi_line_with_options_and_files_directive() {
-        let input = "\
-// <wk: full-check
-// files = { ./a.ts, ./b.py }
-// options={model=\"opus\", verbose=\"true\"}
-// Check everything. />";
-        let (markers, errors) = parse(input);
-        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
-        assert_eq!(markers.len(), 1);
-        assert_eq!(markers[0].name, "full-check");
-        assert_eq!(markers[0].instruction, "Check everything.");
-        assert_eq!(markers[0].options.get("model").unwrap(), "opus");
-        assert_eq!(markers[0].options.get("verbose").unwrap(), "true");
-        assert_eq!(markers[0].files.len(), 2);
-    }
-
-    #[test]
-    fn watcher_knight_long_prefix() {
-        let input = "# <watcher-knight: long-name Check it. />";
-        let (markers, errors) = parse(input);
-        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
-        assert_eq!(markers.len(), 1);
-        assert_eq!(markers[0].name, "long-name");
-        assert_eq!(markers[0].instruction, "Check it.");
     }
 
     #[test]
@@ -776,7 +706,7 @@ some code here
     #[test]
     fn error_malformed_options() {
         let input = "\
-// <wk: bad-opts [.]
+// <wk: bad-opts [./*]
 // options={broken}
 // Check it. />";
         let (markers, errors) = parse(input);
@@ -792,7 +722,7 @@ some code here
     #[test]
     fn error_malformed_options_line_number() {
         let input = "\
-// <wk: bad-opts [.]
+// <wk: bad-opts [./*]
 // options={not valid}
 // Check it. />";
         let (_, errors) = parse(input);
@@ -842,10 +772,12 @@ not a comment
         let (pos, prefix) = find_tag_in_line("// <wk: name").unwrap();
         assert_eq!(pos, 3);
         assert_eq!(prefix, "<wk");
+    }
 
-        let (pos, prefix) = find_tag_in_line("# <watcher-knight: name").unwrap();
-        assert_eq!(pos, 2);
-        assert_eq!(prefix, "<watcher-knight");
+    #[test]
+    fn find_tag_rejects_watcher_knight() {
+        // <watcher-knight is no longer a valid tag prefix
+        assert!(find_tag_in_line("# <watcher-knight: name").is_none());
     }
 
     #[test]
@@ -874,8 +806,8 @@ not a comment
 
     #[test]
     fn nom_parse_file_list_single() {
-        let (_, files) = nom_file_list("[.]").unwrap();
-        assert_eq!(files, vec!["."]);
+        let (_, files) = nom_file_list("[./*]").unwrap();
+        assert_eq!(files, vec!["./*"]);
     }
 
     #[test]
@@ -893,12 +825,6 @@ not a comment
     }
 
     #[test]
-    fn nom_parse_files_directive_valid() {
-        let (_, files) = nom_files_directive("files = { ./a.ts, ./b.py }").unwrap();
-        assert_eq!(files, vec!["./a.ts", "./b.py"]);
-    }
-
-    #[test]
     fn normalize_path_resolves_dots() {
         assert_eq!(
             normalize_path(Path::new("example/./frontend.ts")),
@@ -908,5 +834,199 @@ not a comment
             normalize_path(Path::new("example/../src/main.rs")),
             PathBuf::from("src/main.rs"),
         );
+    }
+
+    // ── Additional find_tag_in_line tests ─────────────────────────────────
+
+    #[test]
+    fn find_tag_at_start_of_line() {
+        let r = find_tag_in_line("<wk: foo");
+        assert!(r.is_some());
+        let (pos, prefix) = r.unwrap();
+        assert_eq!(pos, 0);
+        assert_eq!(prefix, "<wk");
+    }
+
+    #[test]
+    fn find_tag_at_end_of_line() {
+        // Tag at end with nothing after — next.is_none() should match
+        let r = find_tag_in_line("// <wk");
+        assert!(r.is_some());
+    }
+
+    #[test]
+    fn find_tag_followed_by_whitespace() {
+        let r = find_tag_in_line("// <wk something");
+        assert!(r.is_some());
+    }
+
+    #[test]
+    fn find_tag_multiple_occurrences_returns_first() {
+        // TAG_PREFIXES is tried longest-first; within a prefix, find() returns first match
+        let r = find_tag_in_line("<wk: a <wk: b").unwrap();
+        assert_eq!(r.0, 0);
+    }
+
+    // ── Additional detect_comment_prefix tests ────────────────────────────
+
+    #[test]
+    fn detect_comment_prefix_empty_string() {
+        assert_eq!(detect_comment_prefix(""), None);
+    }
+
+    #[test]
+    fn detect_comment_prefix_only_whitespace() {
+        assert_eq!(detect_comment_prefix("   "), None);
+    }
+
+    // ── Additional strip_continuation tests ───────────────────────────────
+
+    #[test]
+    fn strip_continuation_no_comment_prefix() {
+        assert_eq!(strip_continuation("  some text", None), Some("some text"));
+    }
+
+    #[test]
+    fn strip_continuation_missing_expected_prefix() {
+        assert_eq!(strip_continuation("no prefix here", Some("//")), None);
+    }
+
+    #[test]
+    fn strip_continuation_empty_line() {
+        assert_eq!(strip_continuation("", Some("//")), None);
+    }
+
+    #[test]
+    fn strip_continuation_prefix_only_line() {
+        assert_eq!(strip_continuation("//", Some("//")), Some(""));
+    }
+
+    // ── Additional extract_raw_tags tests ─────────────────────────────────
+
+    #[test]
+    fn extract_raw_tags_empty_file() {
+        let (tags, errors) = extract_raw_tags("", "test.ts");
+        assert!(tags.is_empty());
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn extract_raw_tags_close_on_own_line() {
+        let input = "// <wk: foo\n// Check it.\n// />";
+        let (tags, errors) = extract_raw_tags(input, "test.ts");
+        assert!(errors.is_empty());
+        assert_eq!(tags.len(), 1);
+    }
+
+    #[test]
+    fn extract_raw_tags_bare_tag_no_comment() {
+        let input = "<wk: bare-tag Check something. />";
+        let (tags, errors) = extract_raw_tags(input, "test.ts");
+        assert!(errors.is_empty());
+        assert_eq!(tags.len(), 1);
+    }
+
+    // ── Additional parse_raw_tag / parse_markers tests ────────────────────
+
+    #[test]
+    fn parse_instruction_only_whitespace() {
+        let input = "// <wk: foo    />";
+        let (markers, errors) = parse(input);
+        assert!(markers.is_empty());
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("no instruction text"));
+    }
+
+    #[test]
+    fn parse_multiple_body_lines_as_instruction() {
+        let input = "\
+// <wk: multi
+// Line one.
+// Line two.
+// Line three. />";
+        let (markers, errors) = parse(input);
+        assert!(errors.is_empty());
+        assert_eq!(markers.len(), 1);
+        assert_eq!(markers[0].instruction, "Line one.\nLine two.\nLine three.");
+    }
+
+    #[test]
+    fn parse_options_on_first_body_line() {
+        let input = "\
+// <wk: test [./*]
+// options={model=\"haiku\"}
+// Check it. />";
+        let (markers, errors) = parse(input);
+        assert!(errors.is_empty());
+        assert_eq!(markers[0].options.get("model").unwrap(), "haiku");
+    }
+
+    #[test]
+    fn parse_rel_path_propagated() {
+        let (markers, _) =
+            parse_markers("// <wk: test Check. />", "src/deep/file.ts", Path::new("/repo"));
+        assert_eq!(markers[0].rel_path, "src/deep/file.ts");
+    }
+
+    #[test]
+    fn parse_line_number_multiline_later_in_file() {
+        let input = "\
+line 1
+line 2
+line 3
+// <wk: late
+// Check it. />";
+        let (markers, errors) = parse(input);
+        assert!(errors.is_empty());
+        assert_eq!(markers[0].line, 4);
+    }
+
+    // ── Additional normalize_path tests ───────────────────────────────────
+
+    #[test]
+    fn normalize_path_empty() {
+        assert_eq!(normalize_path(Path::new("")), PathBuf::from(""));
+    }
+
+    #[test]
+    fn normalize_path_multiple_parent_dirs() {
+        assert_eq!(
+            normalize_path(Path::new("a/b/../../c")),
+            PathBuf::from("c"),
+        );
+    }
+
+    #[test]
+    fn normalize_path_no_special_components() {
+        assert_eq!(
+            normalize_path(Path::new("a/b/c")),
+            PathBuf::from("a/b/c"),
+        );
+    }
+
+    // ── nom parser additional tests ───────────────────────────────────────
+
+    #[test]
+    fn nom_options_empty_pairs() {
+        let (_, pairs) = nom_options("options={}").unwrap();
+        assert!(pairs.is_empty());
+    }
+
+    #[test]
+    fn nom_options_with_spaces() {
+        let (_, pairs) = nom_options("options = { model = \"haiku\" }").unwrap();
+        assert_eq!(pairs, vec![("model", "haiku")]);
+    }
+
+    #[test]
+    fn nom_file_list_with_extra_spaces() {
+        let (_, files) = nom_file_list("[ ./a.ts ,  ./b.py ]").unwrap();
+        assert_eq!(files, vec!["./a.ts", "./b.py"]);
+    }
+
+    #[test]
+    fn nom_name_numeric_start() {
+        let (_, name) = nom_name("123abc").unwrap();
+        assert_eq!(name, "123abc");
     }
 }

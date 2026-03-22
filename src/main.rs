@@ -1,19 +1,13 @@
-mod cache;
-mod claude;
-mod cli;
-mod marker;
-mod prompt;
-
 use clap::Parser;
 
 fn main() {
-    let cli = cli::Cli::parse();
+    let cli = watcher_knight::cli::Cli::parse();
     match cli.command {
-        cli::Command::Run {
+        watcher_knight::cli::Command::Run {
             root,
             model,
             diff,
             no_cache,
-        } => cli::run(&model, diff.as_deref(), no_cache, root.as_deref()),
+        } => watcher_knight::cli::run(&model, diff.as_deref(), no_cache, root.as_deref()),
     }
 }

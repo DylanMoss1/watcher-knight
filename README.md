@@ -6,9 +6,9 @@ Verify code properties that are difficult to reason about using static analysis 
 
 ## What It Does
 
-`watcher-knight` scans your codebase for `<wk ... />` markers.
+`watcher-knight` scans your codebase for `<wk ... />` watchers.
 
-For each marker, it runs a Claude agent to check whether the property still holds.
+For each watchers, it runs a Claude agent to check whether the property still holds.
 
 Think of it as assertions, but for cross-file concerns, architectural constraints, and integration contracts that traditional linters / type checkers / test suites can't catch.
 
@@ -38,15 +38,15 @@ For example (`example/frontend.ts`):
 // (The previous result will be cached unless ./frontend.ts or ./backend.py are updated)
 class BackendAPI {
   // -- EXAMPLE 2: Verifying port constraints --
-  // <wk: only-port-5000 [.]  <-- recursive on all files in current dir
+  // <wk: only-port-5000 [./**/*]
   // options={model="haiku"}
   // Check that this is the only service started on port 5000. />
   //
   // ^ This will pass: this is the only service on port 5000
   constructor(private baseUrl = "http://localhost:5000") { }
 
-  // -- EXAMPLE 3: Updating READMEs --
-  // <wk: error-400-in-readme [.]
+  // -- EXAMPLE 3: Updating README --
+  // <wk: error-400-in-readme
   // example/README.md should explain what happens when the server returns error code 400 />
   //
   // ^ This will fail: the check cannot be completed as example/README.md does not exist
@@ -65,6 +65,45 @@ class BackendAPI {
 To run the watcher knight: 
 
 ![watcher-knight run output](assets/watcher-knight-run.png)
+
+## Options
+
+### CLI Options
+
+```
+watcher-knight run [root] [--model <model>] [--diff [ref]] [--no-cache]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `root` | Git repo root (or cwd if not in a git repo) | Directory to scan for watchers|
+| `--model <model>` | `sonnet` | AI model to use: `haiku`, `sonnet`, or `opus` |
+| `--diff [ref]` | — | Run in diff mode against a git ref. If no ref is given, auto-detects `origin/main` or `origin/master` |
+| `--no-cache` | — | Skip cache and re-validate all watchers |
+
+### Watcher Options
+
+Per-watcher options are set inside the watcher body using `options={...}` syntax:
+
+```ts
+// <wk: my-watcher [./src/*.ts]
+// options={model="haiku", tools="Read,Grep"}
+// Instruction text here />
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `model` | CLI `--model` value | Override the AI model for this specific watcher |
+| `tools` | `Read,Grep,Glob` | Comma-separated list of Claude tools the watcher agent is allowed to use |
+
+### Watcher File Scoping
+
+The `[...]` file list controls which files a watcher watches:
+
+- Paths are relative to the watcher's directory
+- Glob patterns are supported (e.g. `./src/*.ts`, `./migrations/*.sql`)
+- If no files specified, watchers are always re-run and results are never cached
+- In `--diff` mode, only watchers whose scoped files appear in the diff are run
 
 ## Installation
 

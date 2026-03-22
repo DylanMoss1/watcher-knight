@@ -29,9 +29,14 @@ pub fn run_watchers(
         let location = format!("{}:{}", marker.rel_path, marker.line);
         let prompt_text = prompt::build_watcher_prompt(marker, diff);
         let model = model.to_string();
+        let tools = marker
+            .options
+            .get("tools")
+            .cloned()
+            .unwrap_or_else(|| "Read,Grep,Glob".to_string());
 
         thread::spawn(move || {
-            let result = run_single_watcher(&name, &location, &prompt_text, &model);
+            let result = run_single_watcher(&name, &location, &prompt_text, &model, &tools);
             tx.send(result).ok();
         });
     }
@@ -92,7 +97,7 @@ pub fn print_results(results: &[WatcherResult]) {
     }
 }
 
-fn run_single_watcher(name: &str, location: &str, prompt: &str, model: &str) -> WatcherResult {
+fn run_single_watcher(name: &str, location: &str, prompt: &str, model: &str, tools: &str) -> WatcherResult {
     let mut child = process::Command::new("claude")
         .args([
             "-p",
@@ -101,7 +106,7 @@ fn run_single_watcher(name: &str, location: &str, prompt: &str, model: &str) -> 
             "--permission-mode",
             "dontAsk",
             "--allowedTools",
-            "Read,Grep,Glob",
+            tools,
         ])
         .env_remove("CLAUDECODE")
         .stdin(process::Stdio::piped())
@@ -196,4 +201,141 @@ fn extract_json(text: &str) -> Option<&str> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_json ──────────────────────────────────────────────────────
+
+    #[test]
+    fn extract_json_simple_object() {
+        let input = r#"{"is_valid": true}"#;
+        assert_eq!(extract_json(input), Some(input));
+    }
+
+    #[test]
+    fn extract_json_with_surrounding_text() {
+        let input = r#"Here is the result: {"is_valid": false, "reason": "x"} done"#;
+        assert_eq!(
+            extract_json(input),
+            Some(r#"{"is_valid": false, "reason": "x"}"#)
+        );
+    }
+
+    #[test]
+    fn extract_json_nested_braces() {
+        let input = r#"{"a": {"b": 1}}"#;
+        assert_eq!(extract_json(input), Some(input));
+    }
+
+    #[test]
+    fn extract_json_no_braces() {
+        assert_eq!(extract_json("no json here"), None);
+    }
+
+    #[test]
+    fn extract_json_unclosed_brace() {
+        assert_eq!(extract_json("{ unclosed"), None);
+    }
+
+    #[test]
+    fn extract_json_empty_object() {
+        assert_eq!(extract_json("{}"), Some("{}"));
+    }
+
+    #[test]
+    fn extract_json_multiple_objects_returns_first() {
+        let input = r#"{"a":1} {"b":2}"#;
+        assert_eq!(extract_json(input), Some(r#"{"a":1}"#));
+    }
+
+    #[test]
+    fn extract_json_empty_input() {
+        assert_eq!(extract_json(""), None);
+    }
+
+    // ── parse_response ────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_response_valid_true() {
+        let r = parse_response("test", "f:1", r#"{"is_valid": true}"#);
+        assert!(r.is_valid);
+        assert!(r.reason.is_none());
+        assert!(!r.cached);
+    }
+
+    #[test]
+    fn parse_response_valid_false_with_reason() {
+        let r = parse_response("test", "f:1", r#"{"is_valid": false, "reason": "broken"}"#);
+        assert!(!r.is_valid);
+        assert_eq!(r.reason.as_deref(), Some("broken"));
+    }
+
+    #[test]
+    fn parse_response_valid_false_no_reason() {
+        let r = parse_response("test", "f:1", r#"{"is_valid": false}"#);
+        assert!(!r.is_valid);
+        assert_eq!(r.reason.as_deref(), Some("marked invalid with no reason"));
+    }
+
+    #[test]
+    fn parse_response_missing_is_valid_field() {
+        let r = parse_response("test", "f:1", r#"{"other": "data"}"#);
+        assert!(!r.is_valid);
+    }
+
+    #[test]
+    fn parse_response_is_valid_not_bool() {
+        let r = parse_response("test", "f:1", r#"{"is_valid": "yes"}"#);
+        assert!(!r.is_valid);
+    }
+
+    #[test]
+    fn parse_response_non_json_text() {
+        let r = parse_response("test", "f:1", "I could not determine the answer");
+        assert!(!r.is_valid);
+        assert_eq!(
+            r.reason.as_deref(),
+            Some("I could not determine the answer")
+        );
+    }
+
+    #[test]
+    fn parse_response_json_embedded_in_prose() {
+        let r = parse_response(
+            "test",
+            "f:1",
+            r#"Here is my answer: {"is_valid": true} Hope that helps!"#,
+        );
+        assert!(r.is_valid);
+        assert!(r.reason.is_none());
+    }
+
+    #[test]
+    fn parse_response_empty_string() {
+        let r = parse_response("test", "f:1", "");
+        assert!(!r.is_valid);
+        assert_eq!(r.reason.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn parse_response_name_and_location_propagated() {
+        let r = parse_response("my-watcher", "src/app.ts:10", r#"{"is_valid": true}"#);
+        assert_eq!(r.name, "my-watcher");
+        assert_eq!(r.location, "src/app.ts:10");
+    }
+
+    #[test]
+    fn parse_response_valid_true_ignores_reason() {
+        // When is_valid is true, reason should be None even if present in JSON
+        let r = parse_response(
+            "test",
+            "f:1",
+            r#"{"is_valid": true, "reason": "should be ignored"}"#,
+        );
+        assert!(r.is_valid);
+        assert!(r.reason.is_none());
+    }
 }

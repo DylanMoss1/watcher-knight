@@ -39,10 +39,9 @@ Exit code 1 if any watcher fails.
 // instruction text />
 ```
 
-- Tags: `<wk:` or `<watcher-knight:`
+- Tags: `<wk:`
 - Comment styles: `//`, `#`, `--`, `%`, `;`
 - File scope `[...]` restricts which files trigger the watcher; paths are relative to the marker's directory, glob patterns supported
-- `files = { ... }` can be used in the body for longer file lists
 - `options={...}` sets per-marker options (e.g. model override)
 
 ## Project Structure
