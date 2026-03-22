@@ -4,11 +4,18 @@ Automatic code validation tool powered by LLMs.
 
 Verify code properties that are difficult to reason about using static analysis or tests.
 
-## What it does
+## What It Does
 
-watcher-knight scans your repository for inline markers — small annotations in comments that describe rules your code should follow. When you run it, each marker is validated against your current changes by an AI agent that reads the actual codebase to check whether the rule holds.
+`watcher-knight` scans your codebase for `<wk ... />` markers.
 
-Think of it as assertions, but for cross-file concerns, architectural constraints, and integration contracts that traditional linters can't catch.
+For each marker, it runs a Claude agent to check whether the property still holds.
+
+Think of it as assertions, but for cross-file concerns, architectural constraints, and integration contracts that traditional linters / type checkers / test suites can't catch.
+
+Features: 
+- **Caching.** Cache previous results if files-to-watch do not change
+- **Git mode.** Run watchers against git diffs.
+- **Per-watcher options.** Run watchers with different Claude models and permissions.
 
 ## Example Usage
 
