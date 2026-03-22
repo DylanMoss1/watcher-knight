@@ -6,7 +6,7 @@
 
 Automatic code validation tool powered by LLMs.
 
-Verify code properties that are difficult to reason about using static analysis or tests.
+Verify code properties that are difficult to reason about using only static analysis tools and tests.
 
 ## What It Does
 
@@ -18,7 +18,7 @@ Think of it as assertions, but for cross-file concerns, architectural constraint
 
 Features: 
 - **Caching.** Cache previous results if `files-to-watch` do not change
-- **Git mode.** Run watchers against git diffs.
+- **Diff mode.** Run watchers against git diffs.
 - **Per-watcher options.** Specify Claude models and permissions for each watcher.
 
 ## Example Usage
@@ -28,7 +28,7 @@ Add "watchers" anywhere in your codebase using the format:
 ```js
 // <wk: <watcher-name> [<files-to-watch (relative to current dir)>]
 // options={...}  <-- optional
-// Properties to check for / validate />
+// Code properties to validate />
 ```
 
 For example (`examples/frontend.ts`):
@@ -54,7 +54,7 @@ class BackendAPI {
 
   // -- EXAMPLE 3: Updating README --
   // <wk: error-400-in-readme
-  // example/README.md should explain what happens when the server returns error code 400 />
+  // `example/README.md` should explain what happens when the server returns error code 400. />
   //
   // ^ This will fail: the check cannot be completed as example/README.md does not exist
 
