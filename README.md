@@ -1,5 +1,9 @@
 # Watcher Knight
 
+[![Crates.io](https://img.shields.io/crates/v/watcher-knight)](https://crates.io/crates/watcher-knight)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-2024_edition-orange.svg)](https://www.rust-lang.org/)
+
 Automatic code validation tool powered by LLMs.
 
 Verify code properties that are difficult to reason about using static analysis or tests.
