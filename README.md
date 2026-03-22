@@ -54,7 +54,7 @@ class BackendAPI {
 
   // -- EXAMPLE 3: Updating README --
   // <wk: error-400-in-readme
-  // `examples/README.md` should explain what happens when the server returns error code 400. />
+  // `examples/README.md` should explain what happens when error code 400 is returned. />
   //
   // ^ This will fail: the check cannot be completed as examples/README.md does not exist
 
@@ -116,7 +116,8 @@ The `[...]` file list controls which files a watcher watches:
 ## Installation
 
 ```sh
-cargo install --path .
+cargo install watcher-knight
 ```
+
 
 Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to be installed and authenticated.
