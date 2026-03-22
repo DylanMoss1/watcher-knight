@@ -26,9 +26,9 @@ class BackendAPI {
 
   // -- EXAMPLE 3: Updating README --
   // <wk: error-400-in-readme  <-- no files specified: watch all files
-  // `example/README.md` should explain what happens when the server returns error code 400. />
+  // `examples/README.md` should explain what happens when the server returns error code 400. />
   //
-  // ^ FAIL: The check cannot be completed as example/README.md does not exist
+  // ^ FAIL: The check cannot be completed as examples/README.md does not exist
   async getUserData(name: string): Promise<UserData> {
     const res = await fetch(
       `${this.baseUrl}/get_user_data?name=${encodeURIComponent(name)}`,
