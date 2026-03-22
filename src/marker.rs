@@ -68,12 +68,10 @@ fn find_tag_in_line(line: &str) -> Option<(usize, &'static str)> {
 /// Detect which comment prefix appears in the text before the tag.
 fn detect_comment_prefix(before_tag: &str) -> Option<&'static str> {
     let trimmed = before_tag.trim();
-    for &prefix in COMMENT_PREFIXES {
-        if trimmed == prefix || trimmed.ends_with(prefix) {
-            return Some(prefix);
-        }
-    }
-    None
+    COMMENT_PREFIXES
+        .iter()
+        .find(|&&prefix| trimmed == prefix || trimmed.ends_with(prefix))
+        .copied()
 }
 
 /// Strip a comment prefix from a continuation line. Returns `None` if a comment
@@ -820,8 +818,8 @@ not a comment
     #[test]
     fn normalize_path_resolves_dots() {
         assert_eq!(
-            normalize_path(Path::new("example/./frontend.ts")),
-            PathBuf::from("example/frontend.ts"),
+            normalize_path(Path::new("examples/./frontend.ts")),
+            PathBuf::from("examples/frontend.ts"),
         );
         assert_eq!(
             normalize_path(Path::new("example/../src/main.rs")),
@@ -1023,14 +1021,14 @@ line 3
     #[test]
     fn example_frontend_parses_markers() {
         let contents =
-            std::fs::read_to_string("example/frontend.ts").expect("example/frontend.ts missing");
+            std::fs::read_to_string("examples/frontend.ts").expect("examples/frontend.ts missing");
         let repo_root = Path::new(".");
-        let (markers, _errors) = parse_markers(&contents, "example/frontend.ts", repo_root);
+        let (markers, _errors) = parse_markers(&contents, "examples/frontend.ts", repo_root);
         // frontend.ts has a format-explanation comment that looks like a marker but
         // isn't valid — so we only check that real markers are found.
         assert!(
             markers.len() >= 2,
-            "expected at least 2 markers in example/frontend.ts, got {}",
+            "expected at least 2 markers in examples/frontend.ts, got {}",
             markers.len()
         );
     }
@@ -1038,12 +1036,12 @@ line 3
     #[test]
     fn example_backend_parses_without_errors() {
         let contents =
-            std::fs::read_to_string("example/backend.py").expect("example/backend.py missing");
+            std::fs::read_to_string("examples/backend.py").expect("examples/backend.py missing");
         let repo_root = Path::new(".");
-        let (_markers, errors) = parse_markers(&contents, "example/backend.py", repo_root);
+        let (_markers, errors) = parse_markers(&contents, "examples/backend.py", repo_root);
         assert!(
             errors.is_empty(),
-            "parse errors in example/backend.py: {errors:?}"
+            "parse errors in examples/backend.py: {errors:?}"
         );
     }
 }

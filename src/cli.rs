@@ -74,10 +74,10 @@ fn resolve_root(explicit: Option<&Path>) -> PathBuf {
     }
 
     // Try git repo first, fall back to cwd.
-    if let Ok(repo) = git2::Repository::discover(".") {
-        if let Some(workdir) = repo.workdir() {
-            return workdir.to_path_buf();
-        }
+    if let Ok(repo) = git2::Repository::discover(".")
+        && let Some(workdir) = repo.workdir()
+    {
+        return workdir.to_path_buf();
     }
     std::env::current_dir().unwrap_or_else(|e| {
         eprintln!("Error: cannot determine working directory: {e}");
@@ -212,10 +212,10 @@ fn resolve_diff_ref(root: &Path) -> String {
             .stdout(process::Stdio::null())
             .stderr(process::Stdio::null())
             .status();
-        if let Ok(status) = output {
-            if status.success() {
-                return candidate.to_string();
-            }
+        if let Ok(status) = output
+            && status.success()
+        {
+            return candidate.to_string();
         }
     }
     eprintln!(

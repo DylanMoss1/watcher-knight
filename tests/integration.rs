@@ -67,4 +67,3 @@ fn cli_run_file_not_dir() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("not a directory"), "stderr was: {stderr}");
 }
-
