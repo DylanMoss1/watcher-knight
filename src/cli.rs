@@ -20,6 +20,10 @@ pub struct Cli {
 pub enum Command {
     /// Scan the repository for watcher-knight markers and validate them
     Run {
+        /// Directory to scan for markers (default: git repo root, or cwd)
+        #[arg()]
+        root: Option<PathBuf>,
+
         /// AI model to use [haiku, sonnet, opus]
         #[arg(long, default_value = "sonnet")]
         model: String,
@@ -34,8 +38,8 @@ pub enum Command {
     },
 }
 
-pub fn run(model: &str, diff: Option<&str>, no_cache: bool) {
-    let root = find_root();
+pub fn run(model: &str, diff: Option<&str>, no_cache: bool, root_arg: Option<&Path>) {
+    let root = resolve_root(root_arg);
 
     let mut markers = collect_markers(&root);
     if markers.is_empty() {
@@ -50,8 +54,29 @@ pub fn run(model: &str, diff: Option<&str>, no_cache: bool) {
     }
 }
 
-fn find_root() -> PathBuf {
-    // Try git repo first, fall back to cwd
+/// Determine the root directory to scan for markers.
+///
+/// If an explicit path is given, canonicalize and use it directly.
+/// Otherwise fall back to the git repo root, then the current working directory.
+fn resolve_root(explicit: Option<&Path>) -> PathBuf {
+    if let Some(path) = explicit {
+        match path.canonicalize() {
+            Ok(p) if p.is_dir() => return p,
+            Ok(p) => {
+                eprintln!(
+                    "Error: `{}` is not a directory",
+                    p.display(),
+                );
+                process::exit(1);
+            }
+            Err(e) => {
+                eprintln!("Error: cannot resolve path `{}`: {e}", path.display());
+                process::exit(1);
+            }
+        }
+    }
+
+    // Try git repo first, fall back to cwd.
     if let Ok(repo) = git2::Repository::discover(".") {
         if let Some(workdir) = repo.workdir() {
             return workdir.to_path_buf();
@@ -65,13 +90,11 @@ fn find_root() -> PathBuf {
 
 fn collect_markers(root: &Path) -> Vec<marker::Marker> {
     let mut markers = Vec::new();
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| {
-            let name = e.file_name();
-            name != ".git" && name != ".watcher_knight"
-        })
-    {
+    let mut all_errors = Vec::new();
+    for entry in WalkDir::new(root).into_iter().filter_entry(|e| {
+        let name = e.file_name();
+        name != ".git" && name != ".watcher_knight"
+    }) {
         let entry = match entry {
             Ok(e) if e.file_type().is_file() => e,
             _ => continue,
@@ -86,7 +109,12 @@ fn collect_markers(root: &Path) -> Vec<marker::Marker> {
             .unwrap_or(entry.path())
             .to_string_lossy()
             .to_string();
-        markers.extend(marker::parse_markers(&contents, &rel_path, root));
+        let (file_markers, file_errors) = marker::parse_markers(&contents, &rel_path, root);
+        markers.extend(file_markers);
+        all_errors.extend(file_errors);
+    }
+    for err in &all_errors {
+        eprintln!("\x1b[33m[WARNING] {err}\x1b[0m");
     }
     markers
 }
@@ -143,7 +171,10 @@ fn run_cache_mode(root: &Path, markers: &[marker::Marker], model: &str, no_cache
             } else {
                 "\x1b[31mFAILED\x1b[0m"
             };
-            eprintln!("[{completed}/{n}] {}... {status} \x1b[90m(cached)\x1b[0m", marker.name);
+            eprintln!(
+                "[{completed}/{n}] {}... {status} \x1b[90m(cached)\x1b[0m",
+                marker.name
+            );
             cached_results.push(claude::WatcherResult {
                 name: marker.name.clone(),
                 location: format!("{}:{}", marker.rel_path, marker.line),
@@ -156,10 +187,7 @@ fn run_cache_mode(root: &Path, markers: &[marker::Marker], model: &str, no_cache
         }
     }
 
-    let to_run: Vec<marker::Marker> = to_run_indices
-        .iter()
-        .map(|&i| markers[i].clone())
-        .collect();
+    let to_run: Vec<marker::Marker> = to_run_indices.iter().map(|&i| markers[i].clone()).collect();
 
     let fresh_results = if to_run.is_empty() && cached_results.is_empty() {
         Vec::new()
@@ -193,7 +221,9 @@ fn resolve_diff_ref(root: &Path) -> String {
             }
         }
     }
-    eprintln!("Error: could not find origin/main or origin/master. Pass a ref explicitly: --diff <ref>");
+    eprintln!(
+        "Error: could not find origin/main or origin/master. Pass a ref explicitly: --diff <ref>"
+    );
     process::exit(1);
 }
 

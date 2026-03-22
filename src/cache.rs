@@ -40,6 +40,20 @@ fn hash_string(s: &str) -> u64 {
     hasher.finish()
 }
 
+/// Hash a marker's instruction and options together so that changing either
+/// invalidates the cache.
+fn marker_content_hash(marker: &Marker) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    marker.instruction.hash(&mut hasher);
+    let mut opts: Vec<_> = marker.options.iter().collect();
+    opts.sort_by_key(|(k, _)| (*k).clone());
+    for (k, v) in opts {
+        k.hash(&mut hasher);
+        v.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
 fn cache_key(marker: &Marker) -> String {
     format!("{}::{}", marker.name, marker.rel_path)
 }
@@ -67,7 +81,7 @@ pub fn check_cache<'a>(marker: &Marker, cache: &'a Cache, root: &Path) -> Option
     let entry = cache.get(&key)?;
 
     // Check marker instruction hash
-    if entry.marker_hash != hash_string(&marker.instruction) {
+    if entry.marker_hash != marker_content_hash(marker) {
         return None;
     }
 
@@ -84,7 +98,7 @@ pub fn check_cache<'a>(marker: &Marker, cache: &'a Cache, root: &Path) -> Option
 pub fn build_entry(marker: &Marker, result: &WatcherResult, root: &Path) -> (String, CacheEntry) {
     let key = cache_key(marker);
     let entry = CacheEntry {
-        marker_hash: hash_string(&marker.instruction),
+        marker_hash: marker_content_hash(marker),
         file_hashes: hash_watched_files(marker, root),
         is_valid: result.is_valid,
         reason: result.reason.clone(),

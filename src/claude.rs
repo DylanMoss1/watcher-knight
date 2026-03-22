@@ -61,7 +61,11 @@ pub fn print_results(results: &[WatcherResult]) {
         println!("\x1b[31m==== FAILURES ====");
         for f in &failures {
             println!();
-            let cached_tag = if f.cached { " \x1b[90m(cached)\x1b[31m" } else { "" };
+            let cached_tag = if f.cached {
+                " \x1b[90m(cached)\x1b[31m"
+            } else {
+                ""
+            };
             println!("---- {} ({}){} ----", f.name, f.location, cached_tag);
             println!();
             println!("{}\n", f.reason.as_deref().unwrap_or("unknown reason"));
@@ -79,7 +83,9 @@ pub fn print_results(results: &[WatcherResult]) {
     };
     println!();
     if failed == 0 {
-        println!("watcher-knight result: \x1b[32mOK\x1b[0m. {passed} passed; 0 failed{cached_suffix}");
+        println!(
+            "watcher-knight result: \x1b[32mOK\x1b[0m. {passed} passed; 0 failed{cached_suffix}"
+        );
     } else {
         println!("watcher-knight result: \x1b[31mFAILED\x1b[0m. {passed} passed; {failed} failed{cached_suffix}");
         process::exit(1);
