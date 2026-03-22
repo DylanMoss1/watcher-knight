@@ -2,6 +2,8 @@
 name = "watcher-knight"
 version = "0.1.0"
 edition = "2024"
+description = "A Rust CLI that validates code properties using Claude AI agents."
+license = "MIT"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -9,7 +11,7 @@ git2 = "0.20"
 glob = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-nom = "7"
+nom = "8"
 walkdir = "2"
 
 [dev-dependencies]
