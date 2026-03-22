@@ -21,7 +21,7 @@ Features:
 
 Add "watchers" anywhere in your codebase using the format:
 
-```ts
+```js
 // <wk: <watcher-name> [<files-to-watch (relative to current dir)>]
 // options={...}  <-- optional
 // Properties to check for / validate />
@@ -29,7 +29,7 @@ Add "watchers" anywhere in your codebase using the format:
 
 For example (`example/frontend.ts`):
 
-```ts
+```js
 // -- EXAMPLE 1: Validating APIs --
 // <wk: front-and-backend-api-align [./frontend.ts, ./backend.py]
 // Ensure that the backend (backend.py) and frontend (frontend.ts) API definitions align />
@@ -64,7 +64,7 @@ class BackendAPI {
 
 To run the watcher knight: 
 
-![watcher-knight run output](assets/watcher-knight-run.png)
+![watcher-knight run output](https://raw.githubusercontent.com/DylanMoss1/watcher-knight/main/assets/watcher-knight-run.png)
 
 ## Options
 
@@ -85,7 +85,7 @@ watcher-knight run [root] [--model <model>] [--diff [ref]] [--no-cache]
 
 Per-watcher options are set inside the watcher body using `options={...}` syntax:
 
-```ts
+```js
 // <wk: my-watcher [./src/*.ts]
 // options={model="haiku", tools="Read,Grep"}
 // Instruction text here />
