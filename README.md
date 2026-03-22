@@ -23,17 +23,6 @@ Add "watchers" anywhere in your codebase using the format:
 For example (`example/frontend.ts`):
 
 ```ts
-interface UserData {
-  name: string;
-  email: string;
-  age: number;
-}
-
-// WATCHER-KNIGHT FORMAT:
-// <wk: <watcher-name> [<files-to-watch (relative to current dir)>]
-// options={...}  <-- optional
-// Properties to check for & validate />
-
 // EXAMPLE 1: Validating APIs
 // <wk: front-and-backend-api-align [./frontend.ts, ./backend.py]
 // Ensure that the backend (backend.py) and frontend (frontend.ts) API definitions align />
