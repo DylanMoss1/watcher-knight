@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use nom::bytes::complete::{tag, take_while, take_while1};
 use nom::character::complete::{char, space0};
 use nom::multi::separated_list0;
-use nom::sequence::tuple;
+use nom::Parser;
 use nom::IResult;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ fn nom_file_list(input: &str) -> IResult<&str, Vec<&str>> {
     let (input, _) = char('[')(input)?;
     let (input, _) = space0(input)?;
     let (input, files) =
-        separated_list0(tuple((space0, char(','), space0)), nom_file_entry)(input)?;
+        separated_list0((space0, char(','), space0), nom_file_entry).parse(input)?;
     let (input, _) = space0(input)?;
     let (input, _) = char(']')(input)?;
     Ok((input, files))
@@ -231,7 +231,7 @@ fn nom_options(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     let (input, _) = space0(input)?;
     let (input, _) = char('{')(input)?;
     let (input, _) = space0(input)?;
-    let (input, pairs) = separated_list0(tuple((space0, char(','), space0)), nom_key_value)(input)?;
+    let (input, pairs) = separated_list0((space0, char(','), space0), nom_key_value).parse(input)?;
     let (input, _) = space0(input)?;
     let (input, _) = char('}')(input)?;
     Ok((input, pairs))
